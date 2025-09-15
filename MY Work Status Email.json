@@ -1,0 +1,146 @@
+{
+  "name": "MY Work Status Email copy",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -336,
+        160
+      ],
+      "id": "a0860a70-6c1b-40b6-bffb-6278d75b62f0",
+      "name": "Schedule Trigger1"
+    },
+    {
+      "parameters": {
+        "fromEmail": "zabi.anwar294@gmail.com",
+        "toEmail": "zabi.anwar294@gmail.com",
+        "subject": "=AI & Digital Transformation - Shahzaib Anwar | {{$now.format(\"DD\")}}\n",
+        "html": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        336,
+        160
+      ],
+      "id": "ae645978-69d6-4ebd-a738-9aabbfdd5682",
+      "name": "Send email1",
+      "webhookId": "8a54600b-eacb-4b3d-b580-472974d78f80",
+      "credentials": {
+        "smtp": {
+          "id": "NNStUn0g3jK8BBkV",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "airtableOAuth2Api",
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "https://airtable.com/appOODgNR549KZilF/tble3BzPh4sb0iq4t/viwAsOXHNHJnsn7Fw?blocks=hide",
+          "mode": "url"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tble3BzPh4sb0iq4t",
+          "mode": "list",
+          "cachedResultName": "Digital Transformation",
+          "cachedResultUrl": "https://airtable.com/appOODgNR549KZilF/tble3BzPh4sb0iq4t"
+        },
+        "filterByFormula": "=",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        -112,
+        160
+      ],
+      "id": "f3e5461e-4995-440f-bd64-9d9e996300a9",
+      "name": "Get Status from AirTable1",
+      "credentials": {
+        "airtableOAuth2Api": {
+          "id": "pI8vZIEP2g1cdqnW",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// =================== Helpers ===================\nconst toStartOfDay = d => { const x = new Date(d); x.setHours(0,0,0,0); return x; };\nconst parseDate = v => { if(!v) return null; const d = new Date(v); return isNaN(d)?null:d; };\nconst fmtDate = v => { const d = parseDate(v); if(!d) return \"\"; return d.toLocaleDateString(\"en-GB\",{day:\"2-digit\",month:\"short\",year:\"numeric\",weekday:\"short\"}); };\n\n// Turn collaborator/array/object into a readable string\nconst labelize = (v) => {\n  if (v == null) return \"\";\n  if (typeof v === \"string\" || typeof v === \"number\") return String(v);\n  if (Array.isArray(v)) return v.map(x => labelize(x)).filter(Boolean).join(\", \");\n  if (typeof v === \"object\") return v.name || v.fullName || v.displayName || v.email || v.text || v.title || \"\";\n  return \"\";\n};\n\nconst today = toStartOfDay(new Date());\nconst in7   = new Date(today); in7.setDate(in7.getDate()+7);\n\n// =================== Normalize rows ===================\nconst enriched = items.map(i=>{\n  const j = i.json||{};\n  const statusRaw = (j.Status||\"\").toString().trim();\n  const status = statusRaw.toLowerCase();\n  const td = parseDate(j[\"Target Date\"]);\n  const isDone = status===\"done\";\n  const isInProgress = status===\"in progress\" || status===\"in-progress\" || status===\"working\";\n  const isOverdue = !isDone && td && toStartOfDay(td) < today;\n\n  // Outlook-safe inline row color\n  let rowStyle = \"background:#ffffff;\";\n  if (isOverdue)         rowStyle = \"background:#fee2e2;\";   // light red\n  else if (isInProgress) rowStyle = \"background:#fff7ed;\";   // light orange\n  else if (isDone)       rowStyle = \"background:#dcfce7;\";   // light green\n\n  const priorityRaw = (j.Priority||\"\").toString().trim().toLowerCase();\n  const isHigh = priorityRaw===\"high\";\n\n  return {\n    Task: j.Task ?? \"\",\n    Notes: j.Notes ?? \"\",\n    AssigneeRaw: j.Assignee,\n    AssigneeDisplay: labelize(j.Assignee), // <-- fixed for [object Object]\n    Status: statusRaw,\n    TargetDate: td,\n    TargetDateDisplay: fmtDate(j[\"Target Date\"]),\n    Summary: j.Summary ?? \"\",\n    Priority: j.Priority ?? \"\",\n    isDone, isInProgress, isOverdue, isHigh,\n    rowStyle\n  };\n});\n\n// =================== KPIs ===================\nconst total = enriched.length;\nconst doneCount = enriched.filter(r=>r.isDone).length;\nconst inProgressCount = enriched.filter(r=>r.isInProgress).length;\nconst overdueCount = enriched.filter(r=>r.isOverdue).length;\nconst dueTodayCount = enriched.filter(r=>!r.isDone && r.TargetDate && toStartOfDay(r.TargetDate).getTime()===today.getTime()).length;\nconst dueNext7Count = enriched.filter(r=>{\n  if(!r.TargetDate || r.isDone) return false;\n  const t = toStartOfDay(r.TargetDate);\n  return t>today && t<=in7;\n}).length;\n\n// =================== Sort order ===================\nconst rank = r => r.isOverdue?0 : r.isInProgress?1 : r.isDone?3 : 2;\nenriched.sort((a,b)=>{ \n  const d=rank(a)-rank(b); \n  if(d!==0) return d;\n  const at=a.TargetDate ? a.TargetDate.getTime():Infinity;\n  const bt=b.TargetDate ? b.TargetDate.getTime():Infinity;\n  return at-bt;\n});\n\n// =================== KPI tiles (table cells) ===================\nconst kpiCell = (label, value, bg) => `\n  <td style=\"border:1px solid #e5e7eb;background:${bg};padding:10px 12px;\">\n    <div style=\"font-size:12px;color:#6b7280;font-family:Arial,Helvetica,sans-serif;\">${label}</div>\n    <div style=\"font-size:18px;font-weight:bold;color:#111827;font-family:Arial,Helvetica,sans-serif;\">${value}</div>\n  </td>`;\n\nconst kpisHtml = `\n  <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" style=\"border-collapse:collapse;margin:12px 0 16px 0;\">\n    <tr>\n      ${kpiCell(\"Total Tasks\", total, \"#f9fafb\")}\n      ${kpiCell(\"Completed (Done)\", \"✅ \"+doneCount, \"#ecfdf5\")}\n      ${kpiCell(\"In Progress\", \"🟡 \"+inProgressCount, \"#fff7ed\")}\n    </tr>\n    <tr>\n      ${kpiCell(\"Overdue\", \"🔴 \"+overdueCount, \"#fef2f2\")}\n      ${kpiCell(\"Due Today\", \"🗓️ \"+dueTodayCount, \"#f9fafb\")}\n      ${kpiCell(\"Due Next 7 Days\", \"⏳ \"+dueNext7Count, \"#f9fafb\")}\n    </tr>\n  </table>`;\n\n// =================== Disclaimer ===================\nconst disclaimerHtml = `\n  <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;margin:0 0 12px 0;\">\n    <tr>\n      <td style=\"background:#fff8c5;border:1px solid #e5e7eb;padding:10px;font-size:13px;color:#92400e;font-family:Arial,Helvetica,sans-serif;\">\n        ⚠️ This email is being sent by an <b>AI Agent</b> and may contain some errors/issues as it is still in <b>testing mode</b>.\n      </td>\n    </tr>\n  </table>`;\n\n// =================== Legend (pure tables, Outlook-safe) ===================\nconst legendHtml = `\n  <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;margin:8px 0 12px 0;font-family:Arial,Helvetica,sans-serif;\">\n    <tr>\n      <td style=\"padding:4px 12px 4px 0;font-size:12px;color:#6b7280;\">\n        <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;display:inline-block;\"><tr>\n          <td width=\"14\" height=\"14\" style=\"background:#fee2e2;border:1px solid #d1d5db;\"></td>\n        </tr></table>&nbsp;Overdue\n      </td>\n      <td style=\"padding:4px 12px 4px 0;font-size:12px;color:#6b7280;\">\n        <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;display:inline-block;\"><tr>\n          <td width=\"14\" height=\"14\" style=\"background:#fff7ed;border:1px solid #d1d5db;\"></td>\n        </tr></table>&nbsp;In Progress\n      </td>\n      <td style=\"padding:4px 12px 4px 0;font-size:12px;color:#6b7280;\">\n        <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;display:inline-block;\"><tr>\n          <td width=\"14\" height=\"14\" style=\"background:#dcfce7;border:1px solid #d1d5db;\"></td>\n        </tr></table>&nbsp;Done\n      </td>\n      <td style=\"padding:4px 0 4px 0;font-size:12px;color:#6b7280;\">\n        <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse:collapse;display:inline-block;\"><tr>\n          <td style=\"background:#fee2e2;border:1px solid #fecaca;padding:2px 8px;color:#991b1b;font-size:11px;font-weight:bold;text-align:center;\">HIGH</td>\n        </tr></table>&nbsp;Priority\n      </td>\n    </tr>\n  </table>`;\n\n// =================== Rows (inline styles only) ===================\nconst rowHtml = enriched.map(r => `\n  <tr style=\"${r.rowStyle}\">\n    <td style=\"border:1px solid #e5e7eb;padding:8px;font-family:Arial,Helvetica,sans-serif;\">\n      ${r.isHigh ? '<span style=\"display:inline-block;padding:2px 8px;border:1px solid #fecaca;background:#fee2e2;color:#991b1b;font-size:11px;font-weight:bold;border-radius:12px;margin-right:6px;\">HIGH</span>' : \"\"}\n      ${r.Task}\n    </td>\n    <td style=\"border:1px solid #e5e7eb;padding:8px;font-family:Arial,Helvetica,sans-serif;\">${r.Notes || \"\"}</td>\n    <td style=\"border:1px solid #e5e7eb;padding:8px;font-family:Arial,Helvetica,sans-serif;\">${r.AssigneeDisplay || \"\"}</td>\n    <td style=\"border:1px solid #e5e7eb;padding:8px;font-family:Arial,Helvetica,sans-serif;\">${r.Status || \"\"}</td>\n    <td style=\"border:1px solid #e5e7eb;padding:8px;font-family:Arial,Helvetica,sans-serif;\">${r.TargetDateDisplay || \"\"}</td>\n    <td style=\"border:1px solid #e5e7eb;padding:8px;font-family:Arial,Helvetica,sans-serif;\">${r.Summary || \"\"}</td>\n  </tr>\n`).join(\"\");\n\n// =================== Final HTML ===================\nconst todayLabel = today.toLocaleDateString(\"en-GB\",{day:\"2-digit\",month:\"short\",year:\"numeric\",weekday:\"short\"});\n\nconst html = `\n<!doctype html>\n<html>\n<head><meta charset=\"utf-8\"></head>\n<body style=\"margin:0;padding:0;background:#ffffff;\">\n  <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" style=\"border-collapse:collapse;background:#ffffff;\">\n    <tr>\n      <td align=\"center\" style=\"padding:16px;\">\n        <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" width=\"760\" style=\"border-collapse:collapse;\">\n          <tr>\n            <td style=\"font-family:Arial,Helvetica,sans-serif;color:#111827;font-size:18px;font-weight:bold;padding:0 0 8px 0;\">\n              My Tasks Report\n            </td>\n          </tr>\n          <tr>\n            <td style=\"font-family:Arial,Helvetica,sans-serif;color:#111827;font-size:22px;font-weight:bold;padding:0 0 8px 0;\">\n              📌 ${todayLabel}\n            </td>\n          </tr>\n\n          <tr><td>${kpisHtml}</td></tr>\n          <tr><td>${disclaimerHtml}</td></tr>\n          <tr><td>${legendHtml}</td></tr>\n\n          <tr>\n            <td>\n              <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" width=\"100%\" style=\"border-collapse:collapse;\">\n                <tr>\n                  <th align=\"left\" style=\"background:#22c55e;color:#ffffff;border:1px solid #e5e7eb;padding:8px;font-family:Arial,Helvetica,sans-serif;\">Task</th>\n                  <th align=\"left\" style=\"background:#22c55e;color:#ffffff;border:1px solid #e5e7eb;padding:8px;font-family:Arial,Helvetica,sans-serif;\">Notes</th>\n                  <th align=\"left\" style=\"background:#22c55e;color:#ffffff;border:1px solid #e5e7eb;padding:8px;font-family:Arial,Helvetica,sans-serif;\">Assignee</th>\n                  <th align=\"left\" style=\"background:#22c55e;color:#ffffff;border:1px solid #e5e7eb;padding:8px;font-family:Arial,Helvetica,sans-serif;\">Status</th>\n                  <th align=\"left\" style=\"background:#22c55e;color:#ffffff;border:1px solid #e5e7eb;padding:8px;font-family:Arial,Helvetica,sans-serif;\">Target Date</th>\n                  <th align=\"left\" style=\"background:#22c55e;color:#ffffff;border:1px solid #e5e7eb;padding:8px;font-family:Arial,Helvetica,sans-serif;\">Summary</th>\n                </tr>\n                ${rowHtml}\n              </table>\n            </td>\n          </tr>\n\n          <tr>\n            <td style=\"font-family:Arial,Helvetica,sans-serif;color:#374151;font-size:13px;padding-top:20px;\">\n              Regards,<br><b>AI Bot</b><br>Interwood\n            </td>\n          </tr>\n          <tr>\n            <td align=\"center\" style=\"font-family:Arial,Helvetica,sans-serif;color:#9ca3af;font-size:10px;padding-top:8px;\">\n              Created with ❤️ by Shahzaib\n            </td>\n          </tr>\n        </table>\n      </td>\n    </tr>\n  </table>\n</body>\n</html>\n`;\n\n// Output to Email node\nreturn [{ json: { html } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        112,
+        160
+      ],
+      "id": "a54d48ed-9f65-46bf-831f-655d5de9e205",
+      "name": "Compile & Formatting1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Get Status from AirTable1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Status from AirTable1": {
+      "main": [
+        [
+          {
+            "node": "Compile & Formatting1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compile & Formatting1": {
+      "main": [
+        [
+          {
+            "node": "Send email1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Karachi",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "11b65561-4c9e-40de-8751-827ce62d7416",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "2dceebf6d1185c86c67ab7e1b8a8ec04647ffa80339429c4f94fc9ec60beb154"
+  },
+  "id": "HIYlenNHo8GWCFLt",
+  "tags": []
+}
