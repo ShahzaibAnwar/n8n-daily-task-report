@@ -1,57 +1,42 @@
 # n8n-daily-task-report
 Automated workflow using n8n that fetches tasks from Airtable, formats them into an Outlook-safe HTML email (with KPIs, color-coded rows, and summaries), and sends it automatically on a schedule (daily/weekly).
-# n8n Daily Task Report Workflow
+# n8n Daily Task Report Workflow  
 
-This repository contains an **n8n workflow** that automatically pulls tasks from Airtable, compiles KPIs, and sends a **styled HTML email report**.  
-The email is **Outlook-safe** (table-based, inline CSS) and includes:
-
-- 📊 KPI summary (Total, Completed, In Progress, Overdue, Due Today, Due Next 7 Days)  
-- ✅ Color-coded rows (Done = green, In Progress = orange, Overdue = red)  
-- 🔴 Priority badges (HIGH)  
-- 📅 Nicely formatted dates  
-- 📨 Auto-email scheduling (daily, weekly, or custom)  
+[![n8n](https://img.shields.io/badge/Built%20with-n8n-1f425f.svg)](https://n8n.io)  
+[![Airtable](https://img.shields.io/badge/Data-Airtable-blue)](https://airtable.com)  
+![Outlook Safe](https://img.shields.io/badge/Email-Compatible%20with%20Outlook-green)  
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)  
 
 ---
 
-## 🚀 How it Works
-1. **Schedule Trigger** – set when the report should be sent (e.g., 9:00 AM daily).  
-2. **Airtable Node** – fetches tasks from your Airtable base/view.  
-3. **Code Node** – compiles and formats the tasks into an Outlook-safe HTML email.  
-4. **Email Send Node** – sends the report to chosen recipients.  
+## 📌 Overview  
+This workflow automatically fetches tasks from **Airtable**, compiles them into a **KPI dashboard + color-coded task table**, and sends a **styled HTML email report**.  
+
+✅ Works perfectly in **Gmail and Outlook**  
+📊 Shows **KPIs** (Totals, Done, In Progress, Overdue, Due Today, Due Next 7 Days)  
+🎨 Adds **color-coded rows** + priority badges  
+📅 **Schedules** reports daily, weekly, or at any custom time  
 
 ---
 
-## 🛠 Setup
-1. Clone this repo or import the JSON workflow into your n8n instance.  
-2. Connect your **Airtable** and **Email (SMTP/Gmail/Outlook)** credentials.  
-3. Update Airtable Base/Table/View in the workflow.  
-4. Adjust the schedule (default: 9:00 AM).  
-5. Update the "To Email" field in the Email node.  
-6. Test run once → you’ll see the formatted email in your inbox.  
+## ✨ Features
+- **Automated Reporting** – no manual effort needed.  
+- **Exec-Friendly View** – KPIs at the top, details in a table.  
+- **Outlook Safe** – built with table-based HTML & inline CSS.  
+- **Customizable** – easily change recipients, schedule, and formatting.  
+- **Priority Highlighting** – “HIGH” tasks get a red pill badge.  
 
 ---
 
-## 📌 Example Email Preview
-- CEO-friendly KPI dashboard at the top.  
-- Task list table with assignee, due date, and summary.  
-- Color-coded rows and legend for easy scanning.  
+## ⚡ How It Works
+1. **Schedule Trigger** → sets when report should be sent (default: 9:00 AM).  
+2. **Airtable Node** → fetches rows from your selected base/view.  
+3. **Code Node** → compiles data into an Outlook-safe HTML email.  
+4. **Email Send Node** → delivers report to chosen recipients.  
 
 ---
 
-## 📜 License
-MIT License – feel free to use and adapt.  
-
----
-
-### JSON Workflow
-The exported workflow file is available here:  
-`MY Work Status Email copy.json`
-
----
-
-✅ This makes your GitHub repo ready to be linked in your CV, LinkedIn, or when submitting to **n8n Templates**.
-
----
-
-👉 Do you want me to also create a **fancy README with badges (n8n, Airtable, Outlook-safe, MIT License)** so it looks more like a polished open-source project?
-
+## 🛠 Setup Instructions
+1. Clone or import the JSON workflow:  
+   ```bash
+   git clone https://github.com/ShahzaibAnwar/n8n-daily-task-report.git
